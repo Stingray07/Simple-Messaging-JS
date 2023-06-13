@@ -31,73 +31,67 @@ const userSchema = new mongoose.Schema(
   { collection: "user_pass_collection" }
 );
 const User = mongoose.model("User", userSchema);
-const find = (username, password) => {
-  mongoose
-    .connect(uri, { useNewUrlParser: true, useUnifiedTopology: true })
-    .then(() => {
-      User.findOne({ username: username }).then((user) => {
-        if (user) {
-          return true;
-        }
-      });
-    });
-};
-
-passport.use(
-  new LocalStrategy((username, password, done) => {
+const find = (username) => {
+  console.log(username);
+  return new Promise((resolve, reject) => {
     mongoose
       .connect(uri, { useNewUrlParser: true, useUnifiedTopology: true })
       .then(() => {
         User.findOne({ username: username })
           .then((user) => {
             if (user) {
-              if (password === user.password) {
-                console.log("User found: ", user);
-                done(null, user);
-              } else {
-                console.log("User not found");
-                done(null, false, { message: "Invalid Credentials" });
-              }
+              resolve(user);
             } else {
-              console.log("User not found");
-              done(null, false, { message: "Invalid Credentials" });
+              resolve(null);
             }
           })
           .catch((error) => {
-            console.error(error);
-            done(error);
+            console.log(error);
+            reject(error);
           });
+      })
+      .catch((error) => {
+        console.log(error);
+        reject(error);
+      });
+  });
+};
+
+passport.use(
+  new LocalStrategy((username, password, done) => {
+    find(username)
+      .then((user) => {
+        if (user.password === password) {
+          console.log("User found");
+          done(null, user);
+        } else {
+          done(null, false, { message: "Invalid Credentials" });
+        }
+      })
+      .catch((error) => {
+        console.log(error);
+        done(error);
       });
   })
 );
 
 passport.serializeUser((user, done) => {
-  done(null, user.id);
+  done(null, user);
 });
 
 passport.deserializeUser((user, done) => {
-  mongoose
-    .connect(uri, { useNewUrlParser: true, useUnifiedTopology: true })
-    .then(() => {
-      User.findOne({ username: user.username })
-        .then((user) => {
-          if (user) {
-            done(null, user);
-          } else {
-            done(null, false, { message: "Invalid Credentials" });
-          }
-        })
-        .catch((error) => {
-          console.error(error);
-          done(error);
-        });
+  find(user.username)
+    .then((user) => {
+      if (user) {
+        done(null, user);
+      } else {
+        done(null, false, { message: "Invalid Credentials" });
+      }
+    })
+    .catch((error) => {
+      console.log(error);
+      done(error);
     });
-
-  if (!user) {
-    return done(new Error("USER NOT FOUND"));
-  }
-
-  done(null, user);
 });
 
 const ensureAuthenticated = (req, res, next) => {
@@ -133,33 +127,27 @@ app.get("/test", (req, res) => {
   res.render("test.ejs");
 });
 
-app.post("/register", (req, res, done) => {
+app.post("/register", (req, res) => {
   const username = req.body.username;
   const password = req.body.password;
 
-  mongoose
-    .connect(uri, { useNewUrlParser: true, useUnifiedTopology: true })
-    .then(() => {
-      User.findOne({ username: username })
-        .then((user) => {
-          if (user && username === user.username) {
-            console.log("Username already taken");
-            return res.send({ message: "Username already taken" });
-          } else {
-            const newUser = new User({
-              username: username,
-              password: password,
-            });
-            res.send("User successfully created");
-            return newUser.save();
-          }
-        })
-        .catch((error) => {
-          console.error(error);
-          done(error);
+  find(username)
+    .then((user) => {
+      if (user) {
+        console.log("Username already taken");
+        return res.send({ message: "Username already taken" });
+      } else {
+        const newUser = new User({
+          username: username,
+          password: password,
         });
+        res.send("User successfully created");
+        return newUser.save();
+      }
     })
-    .catch((error) => console.error(error));
+    .catch((error) => {
+      console.error(error);
+    });
 });
 
 app.get("/home", ensureAuthenticated, (req, res) => {
