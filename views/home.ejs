@@ -1,1 +1,63 @@
-HOME
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>HOME</title>
+    <script src="/socket.io/socket.io.js"></script>
+  </head>
+  <body>
+    <div>
+      <label for="message">Message:</label>
+      <input type="text" id="message" name="message" required />
+      <%= user %>
+    </div>
+    <button id="button" type="submit">SEND</button>
+  </body>
+  <script>
+    async function fetchUser() {
+      var urlencoded = new URLSearchParams();
+
+      var requestOptions = {
+        method: "POST",
+        body: urlencoded,
+        redirect: "follow",
+      };
+
+      try {
+        const response = await fetch(
+          "http://localhost:5000/home",
+          requestOptions
+        );
+
+        const data = await response.json();
+        return data;
+      } catch (error) {
+        console.error(error);
+      }
+    }
+
+    fetchUser()
+      .then((result) => {
+        const user = result;
+      })
+      .catch((error) => {
+        console.error(error);
+      });
+
+    const socket = io();
+
+    const sendMessage = () => {
+      const messageInput = document.getElementById("message");
+      const message = messageInput.value;
+
+      socket.emit("chat", message);
+      messageInput.value = "";
+    };
+
+    socket.on("chat", (message) => {
+      console.log("Received message (CLIENT) : " + message);
+      const text = document.createElement("div");
+      text.textContent = message;
+      document.body.appendChild(text);
+    });
+  </script>
+</html>

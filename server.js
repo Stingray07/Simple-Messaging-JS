@@ -5,10 +5,13 @@ const bodyparser = require("body-parser");
 const session = require("express-session");
 const mongoose = require("mongoose");
 const http = require("http");
-
 const app = express();
-const uri = "mongodb://127.0.0.1:27017/APIdbs";
 const server = http.createServer(app);
+const io = require("socket.io")(server);
+const passportIO = require("passport.socketio");
+const { Session } = require("inspector");
+const cookieParser = require("cookie-parser");
+const uri = "mongodb://127.0.0.1:27017/APIdbs";
 
 app.set("view-engine", "ejs");
 app.use(express.urlencoded({ extended: true }));
@@ -23,6 +26,15 @@ app.use(
 app.use(passport.session());
 app.use(passport.initialize());
 
+function onAuthSuccess(data, accept) {
+  data.socket.user = data.user;
+  accept();
+}
+
+function onAuthFail(data, message, error, accept) {
+  accept(new Error("Auth failed"));
+}
+
 const userSchema = new mongoose.Schema(
   {
     username: { type: String, required: true },
@@ -32,7 +44,6 @@ const userSchema = new mongoose.Schema(
 );
 const User = mongoose.model("User", userSchema);
 const find = (username) => {
-  console.log(username);
   return new Promise((resolve, reject) => {
     mongoose
       .connect(uri, { useNewUrlParser: true, useUnifiedTopology: true })
@@ -59,9 +70,11 @@ const find = (username) => {
 
 passport.use(
   new LocalStrategy((username, password, done) => {
+    console.log("username: " + username);
+    console.log("password: " + password);
     find(username)
       .then((user) => {
-        if (user.password === password) {
+        if (user) {
           console.log("User found");
           done(null, user);
         } else {
@@ -76,10 +89,16 @@ passport.use(
 );
 
 passport.serializeUser((user, done) => {
+  if (!user) {
+    done(null, false);
+  }
   done(null, user);
 });
 
 passport.deserializeUser((user, done) => {
+  if (!user) {
+    done(null, false);
+  }
   find(user.username)
     .then((user) => {
       if (user) {
@@ -110,13 +129,25 @@ app.get("/", (req, res) => {
   res.redirect("/login");
 });
 
-app.post(
-  "/login",
-  passport.authenticate("local", {
-    successRedirect: "/home",
-    failureRedirect: "/test",
-  })
-);
+app.post("/login", (req, res, next) => {
+  passport.authenticate("local", (err, user, info) => {
+    if (err) {
+      return next(err);
+    }
+
+    if (!user) {
+      return res.redirect("/test");
+    }
+
+    req.login(user, (err) => {
+      if (err) {
+        return next(err);
+      }
+      req.session.user = user;
+      return res.redirect("/home");
+    });
+  })(req, res, next);
+});
 
 app.get("/register", (req, res) => {
   res.render("register.ejs");
@@ -151,8 +182,29 @@ app.post("/register", (req, res) => {
 });
 
 app.get("/home", ensureAuthenticated, (req, res) => {
-  res.render("home.ejs");
-  console.log("HOME GET");
+  if (req.body.reason === "get_user") {
+    res.send({ user: req.session.user });
+  } else {
+    res.render("home.ejs", { user: JSON.stringify(req.session.user) });
+    console.log("HOME GET");
+    console.log(req.session.user);
+  }
+});
+
+io.on("connection", (socket) => {
+  console.log("A user connected");
+
+  // if (true) {
+  //   const s = { message: message, username: user.username };
+  //   console.log(user.username + ": " + message);
+  //   socket.emit("chat", s);
+  // } else {
+  //   console.log("User data not available");
+  // }
+});
+
+app.post("/home", ensureAuthenticated, (req, res) => {
+  res.send({ user: req.session.user });
 });
 
 server.listen(5000, () => {
