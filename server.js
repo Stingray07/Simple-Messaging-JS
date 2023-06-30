@@ -8,9 +8,6 @@ const http = require("http");
 const app = express();
 const server = http.createServer(app);
 const io = require("socket.io")(server);
-const passportIO = require("passport.socketio");
-const { Session } = require("inspector");
-const cookieParser = require("cookie-parser");
 const uri = "mongodb://127.0.0.1:27017/APIdbs";
 
 app.set("view-engine", "ejs");
@@ -25,15 +22,6 @@ app.use(
 );
 app.use(passport.session());
 app.use(passport.initialize());
-
-function onAuthSuccess(data, accept) {
-  data.socket.user = data.user;
-  accept();
-}
-
-function onAuthFail(data, message, error, accept) {
-  accept(new Error("Auth failed"));
-}
 
 const userSchema = new mongoose.Schema(
   {
@@ -194,13 +182,10 @@ app.get("/home", ensureAuthenticated, (req, res) => {
 io.on("connection", (socket) => {
   console.log("A user connected");
 
-  // if (true) {
-  //   const s = { message: message, username: user.username };
-  //   console.log(user.username + ": " + message);
-  //   socket.emit("chat", s);
-  // } else {
-  //   console.log("User data not available");
-  // }
+  socket.on("chat", (message) => {
+    console.log("RECEIVED MESSAGE: " + message);
+    io.emit("chat", message);
+  });
 });
 
 app.post("/home", ensureAuthenticated, (req, res) => {

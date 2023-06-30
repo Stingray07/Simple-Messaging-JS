@@ -8,11 +8,11 @@
     <div>
       <label for="message">Message:</label>
       <input type="text" id="message" name="message" required />
-      <%= user %>
     </div>
     <button id="button" type="submit">SEND</button>
   </body>
   <script>
+    let user;
     async function fetchUser() {
       var urlencoded = new URLSearchParams();
 
@@ -37,7 +37,8 @@
 
     fetchUser()
       .then((result) => {
-        const user = result;
+        console.log(result);
+        user = result;
       })
       .catch((error) => {
         console.error(error);
@@ -45,18 +46,28 @@
 
     const socket = io();
 
+    const button = document.getElementById("button");
+    button.addEventListener("click", () => {
+      sendMessage();
+      console.log("Message sent");
+    });
+
     const sendMessage = () => {
       const messageInput = document.getElementById("message");
-      const message = messageInput.value;
+      const message = {
+        message: messageInput.value,
+        username: user.user.username,
+      };
 
       socket.emit("chat", message);
       messageInput.value = "";
     };
 
-    socket.on("chat", (message) => {
-      console.log("Received message (CLIENT) : " + message);
+    socket.on("chat", (result) => {
+      console.log(typeof result);
+      console.log("Received message (CLIENT) : " + result);
       const text = document.createElement("div");
-      text.textContent = message;
+      text.textContent = result.username + ": " + result.message;
       document.body.appendChild(text);
     });
   </script>
