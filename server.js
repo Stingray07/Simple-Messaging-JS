@@ -58,8 +58,8 @@ const find = (username) => {
 
 passport.use(
   new LocalStrategy((username, password, done) => {
-    console.log("username: " + username);
-    console.log("password: " + password);
+    console.log("UIsername: " + username);
+    console.log("Password: " + password);
     find(username)
       .then((user) => {
         if (user) {
