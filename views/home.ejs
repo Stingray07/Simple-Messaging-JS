@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>HOME</title>
+    <script src="/socket.io/socket.io.js"></script>
+  </head>
+  <body>
+    <div>
+      <label for="message">Message:</label>
+      <input type="text" id="message" name="message" required />
+    </div>
+    <button id="button" type="submit">SEND</button>
+  </body>
+  <script>
+    let user;
+    async function fetchUser() {
+      var urlencoded = new URLSearchParams();
+
+      var requestOptions = {
+        method: "POST",
+        body: urlencoded,
+        redirect: "follow",
+      };
+      try {
+        const response = await fetch(
+          "http://localhost:5000/home",
+          requestOptions
+        );
+
+        const data = await response.json();
+        return data;
+      } catch (error) {
+        console.error(error);
+      }
+    }
+
+    fetchUser()
+      .then((result) => {
+        console.log(result);
+        user = result;
+      })
+      .catch((error) => {
+        console.error(error);
+      });
+
+    const socket = io();
+
+    const button = document.getElementById("button");
+    button.addEventListener("click", () => {
+      sendMessage();
+      console.log("Message sent");
+    });
+
+    const sendMessage = () => {
+      const messageInput = document.getElementById("message");
+      const message = {
+        message: messageInput.value,
+        username: user.user.username,
+      };
+
+      socket.emit("chat", message);
+      messageInput.value = "";
+    };
+
+    socket.on("chat", (result) => {
+      console.log(typeof result);
+      console.log("Received message (CLIENT) : " + result);
+      const text = document.createElement("div");
+      text.textContent = result.username + ": " + result.message;
+      document.body.appendChild(text);
+    });
+  </script>
+</html>
